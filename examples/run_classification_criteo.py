@@ -4,6 +4,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 
 from deepctr.models import DeepFM
+from deepctr.models import FGCNN
 from deepctr.utils import SingleFeat
 
 if __name__ == "__main__":
@@ -39,7 +40,7 @@ if __name__ == "__main__":
                        [test[feat.name].values for feat in dense_feature_list]
 
     # 4.Define Model,train,predict and evaluate
-    model = DeepFM({"sparse": sparse_feature_list,
+    model = FGCNN({"sparse": sparse_feature_list,
                     "dense": dense_feature_list}, task='binary')
     model.compile("adam", "binary_crossentropy",
                   metrics=['binary_crossentropy'], )
