@@ -9,6 +9,7 @@ Author:
 import itertools
 
 import tensorflow as tf
+import numpy as np
 from tensorflow.python.keras import backend as K
 from tensorflow.python.keras.initializers import (Zeros, glorot_normal,
                                                   glorot_uniform)
@@ -17,6 +18,7 @@ from tensorflow.python.keras.regularizers import l2
 
 from .activation import activation_fun
 from .utils import concat_fun
+
 
 
 class AFMLayer(Layer):
@@ -788,32 +790,93 @@ class FGCNNLayer(Layer):
             input_shape)  # Be sure to call this somewhere!
 
     def call(self, inputs, **kwargs):
+        #inputs (?, 39, 8)   **kwargs打包关键字参数成dict给函数体调用
+        print('inputs-------', inputs)
 
         if K.ndim(inputs) != 3:
             raise ValueError(
                 "Unexpected inputs dimensions %d, expect to be 3 dimensions" % (K.ndim(inputs)))
-
+        # embedding size = 8
         embedding_size = inputs.shape[-1].value
-        pooling_result = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, axis=3))(inputs)
+        print('embedding size----', embedding_size)
 
-        new_feature_list = []
+        input_data = tf.transpose(inputs, [0, 2, 1])
+        # change shape (?, 8, 39)
+        print('change shape*****', input_data)
 
-        for i in range(1, len(self.filters) + 1):
-            filters = self.filters[i - 1]
-            width = self.kernel_width[i - 1]
-            new_filters = self.new_maps[i - 1]
-            pooling_width = self.pooling_width[i - 1]
-            conv_result = tf.keras.layers.Conv2D(filters=filters, kernel_size=(width, 1), strides=(1, 1),
-                                                 padding='same',
-                                                 activation='tanh', use_bias=True, )(pooling_result)
-            pooling_result = tf.keras.layers.MaxPooling2D(pool_size=(pooling_width, 1))(conv_result)
-            flatten_result = tf.keras.layers.Flatten()(pooling_result)
-            new_result = tf.keras.layers.Dense(pooling_result.shape[1].value * embedding_size * new_filters,
-                                               activation='tanh', use_bias=True)(flatten_result)
-            new_feature_list.append(
-                tf.keras.layers.Reshape((pooling_result.shape[1].value * new_filters, embedding_size))(new_result))
-        new_features = concat_fun(new_feature_list, axis=1)
-        return new_features
+        temp = tf.reshape(input_data, (-1, 8, 3, 13))
+        print('change--', temp)
+
+        conv_result_test1 = tf.keras.layers.Conv2D(filters=8, kernel_size=(2, 2), strides=(1, 1),
+                                                  padding='valid',
+                                                  data_format='channels_first',
+                                                  activation='tanh', use_bias=True, )(temp)
+        # conv_result_test (?, 8, 2, 12)
+        print('test conv result----', conv_result_test1)
+
+        conv_result_test2 = tf.keras.layers.Conv2D(filters=8, kernel_size=(2, 2), strides=(1, 1),
+                                                  padding='valid',
+                                                  data_format='channels_first',
+                                                  activation='tanh', use_bias=True, )(conv_result_test1)
+        # conv result 2 (?, 18, 1, 11)
+        print('test result 2-----', conv_result_test2)
+
+        new_generate_feature = tf.reshape(conv_result_test2, (-1, 8, conv_result_test2.shape[2].value * conv_result_test2.shape[3].value))
+        result = tf.transpose(new_generate_feature, [0, 2, 1])
+        print('now shape--', result)
+
+        # # pooling result (?, 39, 8, 14)
+        # pooling_result = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, axis=3))(inputs)
+        # # expand_dims 在第axis位置增加一个维度,值为1
+        # print('pooling result-----', pooling_result)
+        # new_feature_list = []
+        #
+        # for i in range(1, len(self.filters) + 1):
+        #     filters = self.filters[i - 1]
+        #     # filters = 14  / 16 / 18 / 20
+        #     print('filter***', filters)
+        #
+        #     width = self.kernel_width[i - 1]
+        #     # kernel width = 7
+        #     print('kernel width----', width)
+        #
+        #     new_filters = self.new_maps[i - 1]
+        #     # new filters = 3
+        #     print('new filters----', new_filters)
+        #
+        #     pooling_width = self.pooling_width[i - 1]
+        #     # pooling width = 2
+        #     print('pooling width----', pooling_width)
+        #
+        #     conv_result = tf.keras.layers.Conv2D(filters=filters, kernel_size=(width, 1), strides=(1, 1),
+        #                                          padding='same',
+        #                                          activation='tanh', use_bias=True, )(pooling_result)
+        #     # conv_result (?, 39, 8, 14) / (?, 19, 8, 16) /(?, 9, 8, 18) / (?, 4, 8, 20)
+        #     print('conv result****', conv_result)
+        #
+        #     pooling_result = tf.keras.layers.MaxPooling2D(pool_size=(pooling_width, 1))(conv_result)
+        #     # pooling_result (?, 19, 8, 14) / (?, 9, 8, 16) / (?, 4, 8, 18) / (?, 2, 8, 20)
+        #     print('pooling result####', pooling_result)
+        #
+        #     flatten_result = tf.keras.layers.Flatten()(pooling_result)
+        #     # flatten (?, 2128) / (?, 1152) / (?, 576) / (?, 320)
+        #     print('flatten result----', flatten_result)
+        #
+        #     new_result = tf.keras.layers.Dense(pooling_result.shape[1].value * embedding_size * new_filters,
+        #                                        activation='tanh', use_bias=True)(flatten_result)
+        #     # new result (?, 456) / (?, 216) / (?, 96) / (?, 48)
+        #     print('new result******', new_result)
+        #
+        #     new_feature_list.append(
+        #         tf.keras.layers.Reshape((pooling_result.shape[1].value * new_filters, embedding_size))(new_result))
+        #     # new feature list [ (?, 57, 8) / (?, 27, 8) / (?, 12, 8) / (?, 6, 8) ]
+        #     print('new features list-----', new_feature_list)
+        #
+        # new_features = concat_fun(new_feature_list, axis=1)
+        # # new features (?, 102, 8)
+        # print('new features-----', new_features)
+
+        return result
 
     def compute_output_shape(self, input_shape):
 
