@@ -807,7 +807,7 @@ class FGCNNLayer(Layer):
         temp = tf.reshape(input_data, (-1, 8, 3, 13))
         print('change--', temp)
 
-        conv_result_test1 = tf.keras.layers.Conv2D(filters=8, kernel_size=(2, 2), strides=(1, 1),
+        conv_result_test1 = tf.keras.layers.Conv2D(filters=16, kernel_size=(2, 2), strides=(1, 1),
                                                   padding='valid',
                                                   data_format='channels_first',
                                                   activation='tanh', use_bias=True, )(temp)
