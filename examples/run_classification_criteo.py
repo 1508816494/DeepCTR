@@ -6,9 +6,12 @@ from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 from deepctr.models import DeepFM
 from deepctr.models import FGCNN
 from deepctr.utils import SingleFeat
+from keras.callbacks import TensorBoard
+import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
     data = pd.read_csv('./criteo_sample.txt')
+
 
     sparse_features = ['C' + str(i) for i in range(1, 27)]
     dense_features = ['I' + str(i) for i in range(1, 14)]
@@ -46,7 +49,26 @@ if __name__ == "__main__":
                   metrics=['binary_crossentropy'], )
 
     history = model.fit(train_model_input, train[target].values,
-                        batch_size=256, epochs=10, verbose=2, validation_split=0.2, )
+                        batch_size=256, epochs=20, verbose=2, validation_split=0.2)
+    print('history-----', history)
+
+    plt.plot(history.history['loss'])
+    plt.plot(history.history['val_loss'])
+    plt.title("model loss")
+    plt.ylabel("loss")
+    plt.xlabel("epoch")
+    plt.legend(["train", "valid"],loc="upper left")
+    plt.show()
+
+    plt.plot(history.history['binary_crossentropy'])
+    plt.plot(history.history['val_binary_crossentropy'])
+    plt.title("model binary crossentropy")
+    plt.ylabel("crossentropy")
+    plt.xlabel("epoch")
+    plt.legend(["train binary", "valid binary"],loc="upper left")
+    plt.show()
+
+
     pred_ans = model.predict(test_model_input, batch_size=256)
     print("test LogLoss", round(log_loss(test[target].values, pred_ans), 4))
     print("test AUC", round(roc_auc_score(test[target].values, pred_ans), 4))

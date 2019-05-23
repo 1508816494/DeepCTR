@@ -484,7 +484,7 @@ class InnerProductLayer(Layer):
         if K.ndim(inputs[0]) != 3:
             raise ValueError(
                 "Unexpected inputs dimensions %d, expect to be 3 dimensions" % (K.ndim(inputs)))
-
+        # inputs [ (?, 1, 8), (?, 1, 8), ……,(?, 1, 8)]
         embed_list = inputs
         row = []
         col = []
@@ -496,13 +496,15 @@ class InnerProductLayer(Layer):
                 col.append(j)
         p = tf.concat([embed_list[idx]
                        for idx in row], axis=1)  # batch num_pairs k
+        # tf.concat([(?, 1, 8), (?, 1, 8), ……, (?, 1, 8)]) 变为 (?, 15051, 8)
         q = tf.concat([embed_list[idx]
                        for idx in col], axis=1)
-
         inner_product = p * q
+        # inner_product (?, 15051, 8)
         if self.reduce_sum:
             inner_product = tf.reduce_sum(
                 inner_product, axis=2, keep_dims=True)
+        # 求和 (点积) (?, 15051, 1)
         return inner_product
 
     def compute_output_shape(self, input_shape):
@@ -800,6 +802,7 @@ class FGCNNLayer(Layer):
         embedding_size = inputs.shape[-1].value
         print('embedding size----', embedding_size)
 
+        # ****************************** CNN ***************************
         input_data = tf.transpose(inputs, [0, 2, 1])
         # change shape (?, 8, 39)
         print('change shape*****', input_data)
@@ -807,24 +810,34 @@ class FGCNNLayer(Layer):
         temp = tf.reshape(input_data, (-1, 8, 3, 13))
         print('change--', temp)
 
-        conv_result_test1 = tf.keras.layers.Conv2D(filters=16, kernel_size=(2, 2), strides=(1, 1),
+        kernel_list = [(1, 1), (2, 1), (2, 2), (3, 1), (3, 2), (3, 3), (3, 4)]
+        new_feature_list = []
+        for i in range(1, 8):
+            conv_result_test = tf.keras.layers.Conv2D(filters=8, kernel_size=kernel_list[i-1], strides=(1, 1),
                                                   padding='valid',
                                                   data_format='channels_first',
                                                   activation='tanh', use_bias=True, )(temp)
+            new_generate_feature = tf.reshape(conv_result_test, (-1, 8, conv_result_test.shape[2].value * conv_result_test.shape[3].value))
+            result = tf.transpose(new_generate_feature, [0, 2, 1])
+            new_feature_list.append(result)
+
+        new_features = concat_fun(new_feature_list, axis=1)
         # conv_result_test (?, 8, 2, 12)
-        print('test conv result----', conv_result_test1)
+        print('test conv result----', new_features)
 
-        conv_result_test2 = tf.keras.layers.Conv2D(filters=8, kernel_size=(2, 2), strides=(1, 1),
-                                                  padding='valid',
-                                                  data_format='channels_first',
-                                                  activation='tanh', use_bias=True, )(conv_result_test1)
-        # conv result 2 (?, 18, 1, 11)
-        print('test result 2-----', conv_result_test2)
+        # conv_result_test2 = tf.keras.layers.Conv2D(filters=8, kernel_size=(2, 2), strides=(1, 1),
+        #                                           padding='valid',
+        #                                           data_format='channels_first',
+        #                                           activation='tanh', use_bias=True, )(conv_result_test)
+        # # conv result 2 (?, 18, 1, 11)
+        # print('test result 2-----', conv_result_test2)
+        #
+        # new_generate_feature = tf.reshape(conv_result_test2, (-1, 8, conv_result_test2.shape[2].value * conv_result_test2.shape[3].value))
+        # result = tf.transpose(new_generate_feature, [0, 2, 1])
+        # print('now shape--', result)
 
-        new_generate_feature = tf.reshape(conv_result_test2, (-1, 8, conv_result_test2.shape[2].value * conv_result_test2.shape[3].value))
-        result = tf.transpose(new_generate_feature, [0, 2, 1])
-        print('now shape--', result)
 
+        # ************************************ FGCNN *******************************
         # # pooling result (?, 39, 8, 14)
         # pooling_result = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, axis=3))(inputs)
         # # expand_dims 在第axis位置增加一个维度,值为1
@@ -876,7 +889,7 @@ class FGCNNLayer(Layer):
         # # new features (?, 102, 8)
         # print('new features-----', new_features)
 
-        return result
+        return new_features
 
     def compute_output_shape(self, input_shape):
 

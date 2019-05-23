@@ -83,7 +83,7 @@ def FGCNN(feature_dim_dict, embedding_size=8, conv_kernel_width=(7, 7, 7, 7), co
                                                                                  seed, False)
     fg_input = concat_fun(fg_deep_emb_list, axis=1)
     origin_input = concat_fun(deep_emb_list, axis=1)
-
+    # -----------------FGCNNLayer 为FGCNN的逻辑------------
     if len(conv_filters) > 0:
         new_features = FGCNNLayer(
             conv_filters, conv_kernel_width, new_maps, pooling_width)(fg_input)
@@ -91,16 +91,22 @@ def FGCNN(feature_dim_dict, embedding_size=8, conv_kernel_width=(7, 7, 7, 7), co
     else:
         combined_input = origin_input
 
+    # ----------此后为IPNN逻辑---------
     inner_product = tf.keras.layers.Flatten()(InnerProductLayer()(
         tf.keras.layers.Lambda(unstack, mask=[None] * combined_input.shape[1].value)(combined_input)))
+    # 1. lambda操作，将combined_input 变成[ (?, 1, 8), (?, 1, 8), ……,(?, 1, 8)]按位展开
+    # 2. InnerProductLayer的call(inputs) 返回 (?, 15051, 1)
+    # 3. Flatten() (?, 15051) 生成inner_product
     linear_signal = tf.keras.layers.Flatten()(combined_input)
+    # 线性部分即为embedding层的向量（这里是 origin features + new features) flatten变为 (?, 1392)
     dnn_input = tf.keras.layers.Concatenate()([linear_signal, inner_product])
+    # dnn_input (?, 16443) 拼接lz和lp
     dnn_input = tf.keras.layers.Flatten()(dnn_input)
-
+    # dnn_input (?, 16443)
     final_logit = DNN(dnn_hidden_units, dropout_rate=dnn_dropout,
                       l2_reg=l2_reg_dnn)(dnn_input)
     final_logit = tf.keras.layers.Dense(1, use_bias=False)(final_logit)
     output = PredictionLayer(task)(final_logit)
-
+    # output (?, 1)
     model = tf.keras.models.Model(inputs=inputs_list, outputs=output)
     return model
